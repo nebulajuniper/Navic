@@ -488,6 +488,8 @@ class IOSMediaPlayerViewModel(
 				val current = CMTimeGetSeconds(time)
 				if (!total.isNaN() && total > 0) {
 					_uiState.update { it.copy(progress = (current / total).toFloat()) }
+					// Update lock screen metadata once stream duration is calculated
+					_uiState.value.currentSong?.let { updateNowPlayingInfo(it) }
 				}
 			}
 		}
@@ -505,15 +507,30 @@ class IOSMediaPlayerViewModel(
 		info[MPMediaItemPropertyAlbumTitle] = song.albumTitle
 		info[MPNowPlayingInfoPropertyPlaybackRate] = if (_uiState.value.isPaused) 0.0 else 1.0
 
+		// Check player item duration
+		var durationSeconds: Double? = null
 		val duration = player.currentItem?.duration
 		if (duration != null) {
 			val seconds = CMTimeGetSeconds(duration)
-			if (!seconds.isNaN()) {
-				info[MPMediaItemPropertyPlaybackDuration] = seconds
+			if (!seconds.isNaN() && seconds > 0) {
+				durationSeconds = seconds
 			}
 		}
 
-		info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = CMTimeGetSeconds(player.currentTime())
+		// Fallback to DomainSong duration if AVPlayerItem duration is not loaded yet
+		if (durationSeconds == null) {
+			val songDurationMs = song.duration.inWholeMilliseconds
+			if (songDurationMs > 0) {
+				durationSeconds = songDurationMs / 1000.0
+			}
+		}
+
+		durationSeconds?.let {
+			info[MPMediaItemPropertyPlaybackDuration] = it
+		}
+
+		val currentSeconds = CMTimeGetSeconds(player.currentTime())
+		info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = if (currentSeconds.isNaN()) 0.0 else currentSeconds
 
 		info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(
 			boundsSize = CGSizeMake(512.0, 512.0),
