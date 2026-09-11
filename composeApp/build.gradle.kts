@@ -90,6 +90,8 @@ public fun interface TextFieldDecorator {
 }
 
 extensions.configure<KotlinMultiplatformExtension> {
+	jvmToolchain(21)
+
 	listOf(
 		iosArm64(),
 		iosSimulatorArm64()
